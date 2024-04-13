@@ -1,4 +1,4 @@
-/* radare - LGPL3 - Copyright 2016-2021 - Matthieu (c0riolis) Tardy - l0stb1t*/
+/* radare - LGPL3 - Copyright 2016-2020 - Matthieu (c0riolis) Tardy - l0stb1t*/
 
 #include <r_io.h>
 #include <r_bin.h>
@@ -88,7 +88,9 @@ static ut8 *get_bytes(RBuffer *buffer, ut32 size) {
 }
 
 static pyc_object *get_none_object(void) {
-	pyc_object *ret = R_NEW0 (pyc_object);
+	pyc_object *ret;
+
+	ret = R_NEW0 (pyc_object);
 	if (!ret) {
 		return NULL;
 	}
@@ -1135,9 +1137,7 @@ static pyc_object *get_object(RBuffer *buffer) {
 	}
 
 	if (flag && ref_idx) {
-		if (ref_idx->data != ret) {
-			free_object (ref_idx->data);
-		}
+		free_object (ref_idx->data);
 		ref_idx->data = copy_object (ret);
 	}
 	return ret;
