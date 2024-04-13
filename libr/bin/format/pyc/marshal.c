@@ -1190,10 +1190,10 @@ static bool extract_sections_symbols(pyc_object *obj, RList *sections, RList *sy
 	symbol->paddr = cobj->start_offset;
 	symbol->ordinal = symbols_ordinal++;
 	if (cobj->consts->type != TYPE_TUPLE && cobj->consts->type != TYPE_SMALL_TUPLE) {
-		goto fail2;
+		goto fail;
 	}
 	if (!r_list_append (symbols, symbol)) {
-		goto fail2;
+		goto fail;
 	}
 	r_list_foreach (((RList *)(cobj->consts->data)), i, obj) {
 		extract_sections_symbols (obj, sections, symbols, cobjs, prefix);
@@ -1201,11 +1201,8 @@ static bool extract_sections_symbols(pyc_object *obj, RList *sections, RList *sy
 	free (prefix);
 	return true;
 fail:
+
 	free (section);
-	free (prefix);
-	free (symbol);
-	return false;
-fail2:
 	free (prefix);
 	free (symbol);
 	return false;
