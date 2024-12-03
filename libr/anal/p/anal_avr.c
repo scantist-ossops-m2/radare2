@@ -619,7 +619,7 @@ INST_HANDLER (cpi) { // CPI Rd, K
 INST_HANDLER (cpse) {	// CPSE Rd, Rr
 	int r = (buf[0] & 0xf) | ((buf[1] & 0x2) << 3);
 	int d = ((buf[0] >> 4) & 0xf) | ((buf[1] & 0x1) << 4);
-	RAnalOp next_op;
+	RAnalOp next_op = {0};
 
 	// calculate next instruction size (call recursively avr_op_analyze)
 	// and free next_op's esil string (we dont need it now)
@@ -912,6 +912,9 @@ INST_HANDLER (ldi) {	// LDI Rd, K
 }
 
 INST_HANDLER (lds) {	// LDS Rd, k
+	if (len < 4) {
+		return;
+	}
 	int d = ((buf[0] >> 4) & 0xf) | ((buf[1] & 0x1) << 4);
 	int k = (buf[3] << 8) | buf[2];
 	op->ptr = k;
@@ -922,6 +925,9 @@ INST_HANDLER (lds) {	// LDS Rd, k
 }
 
 INST_HANDLER (sts) {	// STS k, Rr
+	if (len < 4) {
+		return;
+	}
 	int r = ((buf[0] >> 4) & 0xf) | ((buf[1] & 0x1) << 4);
 	int k = (buf[3] << 8) | buf[2];
 	op->ptr = k;
@@ -1287,7 +1293,7 @@ INST_HANDLER (sbrx) {	// SBRC Rr, b
 			// SBRS Rr, b
 	int b = buf[0] & 0x7;
 	int r = ((buf[0] >> 4) & 0xf) | ((buf[1] & 0x01) << 4);
-	RAnalOp next_op;
+	RAnalOp next_op = {0};
 
 	// calculate next instruction size (call recursively avr_op_analyze)
 	// and free next_op's esil string (we dont need it now)
@@ -1526,6 +1532,9 @@ OPCODE_DESC opcodes[] = {
 
 static OPCODE_DESC* avr_op_analyze(RAnal *anal, RAnalOp *op, ut64 addr, const ut8 *buf, int len, CPU_MODEL *cpu) {
 	OPCODE_DESC *opcode_desc;
+	if (len < 2) {
+		return NULL;
+	}
 	ut16 ins = (buf[1] << 8) | buf[0];
 	int fail;
 	char *t;
