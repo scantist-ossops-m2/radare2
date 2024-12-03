@@ -748,7 +748,12 @@ static Sdb *store_versioninfo_gnu_verdef(ELFOBJ *bin, Elf_(Shdr) *shdr, int sz) 
 		verdef->vd_hash = READ32 (dfs, j)
 		verdef->vd_aux = READ32 (dfs, j)
 		verdef->vd_next = READ32 (dfs, j)
-		vstart += verdef->vd_aux;
+		int vdaux = verdef->vd_aux;
+		if (vdaux < 1) {
+			sdb_free (sdb_verdef);
+			goto out_error;
+		}
+		vstart += vdaux;
 		if (vstart > end || vstart + sizeof (Elf_(Verdaux)) > end) {
 			sdb_free (sdb_verdef);
 			goto out_error;
@@ -896,7 +901,11 @@ static Sdb *store_versioninfo_gnu_verneed(ELFOBJ *bin, Elf_(Shdr) *shdr, int sz)
 			free (s);
 		}
 		sdb_num_set (sdb_version, "cnt", entry->vn_cnt, 0);
-		vstart += entry->vn_aux;
+		st32 vnaux = entry->vn_aux;
+		if (vnaux < 1) {
+			goto beach;
+		}
+		vstart += vnaux;
 		for (j = 0, isum = i + entry->vn_aux; j < entry->vn_cnt && vstart + sizeof (Elf_(Vernaux)) <= end; ++j) {
 			int k;
 			Elf_(Vernaux) * aux = NULL;
