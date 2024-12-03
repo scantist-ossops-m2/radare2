@@ -68,7 +68,7 @@ static char *__func_name_from_ord(char *module, ut16 ordinal) {
 
 RList *r_bin_ne_get_segments(r_bin_ne_obj_t *bin) {
 	int i;
-	if (!bin) {
+	if (!bin || !bin->segment_entries) {
 		return NULL;
 	}
 	RList *segments = r_list_newf (free);
@@ -363,6 +363,9 @@ RList *r_bin_ne_get_entrypoints(r_bin_ne_obj_t *bin) {
 	}
 	int off = 0;
 	while (off < bin->ne_header->EntryTableLength) {
+		if (bin->entry_table + off + 32 >= r_buf_size (bin->buf)) {
+			break;
+		}
 		ut8 bundle_length = *(ut8 *)(bin->entry_table + off);
 		if (!bundle_length) {
 			break;
@@ -387,7 +390,9 @@ RList *r_bin_ne_get_entrypoints(r_bin_ne_obj_t *bin) {
 				ut8 segnum = *(bin->entry_table + off);
 				off++;
 				ut16 segoff = *(ut16 *)(bin->entry_table + off);
-				entry->paddr = (ut64)bin->segment_entries[segnum - 1].offset * bin->alignment + segoff;
+				if (segnum > 0) {
+					entry->paddr = (ut64)bin->segment_entries[segnum - 1].offset * bin->alignment + segoff;
+				}
 			} else { // Fixed
 				entry->paddr = (ut64)bin->segment_entries[bundle_type - 1].offset * bin->alignment + *(ut16 *)(bin->entry_table + off);
 			}
