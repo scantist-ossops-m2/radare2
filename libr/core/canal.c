@@ -1400,6 +1400,10 @@ static char *core_anal_graph_label(RCore *core, RAnalBlock *bb, int opts) {
 				filestr = r_file_slurp_line (file, line, 0);
 				if (filestr) {
 					int flen = strlen (filestr);
+					if (idx < 0 || ST32_ADD_OVFCHK (idx, flen + 8)) {
+						R_LOG_WARN ("integer overflow detected");
+						break;
+					}
 					cmdstr = realloc (cmdstr, idx + flen + 8);
 					memcpy (cmdstr + idx, filestr, flen);
 					idx += flen;
@@ -5182,10 +5186,6 @@ R_API void r_core_anal_esil(RCore *core, const char *str, const char *target) {
 		arch = R2_ARCH_MIPS;
 	}
 
-	const char *sn = r_reg_get_name (core->anal->reg, R_REG_NAME_SN);
-	if (!sn) {
-		eprintf ("Warning: No SN reg alias for current architecture.\n");
-	}
 	r_reg_arena_push (core->anal->reg);
 
 	IterCtx ictx = { start, end, fcn, NULL};
@@ -5279,6 +5279,10 @@ R_API void r_core_anal_esil(RCore *core, const char *str, const char *target) {
 				i += op.size - 1;
 				goto repeat;
 			}
+		}
+		const char *sn = r_reg_get_name (core->anal->reg, R_REG_NAME_SN);
+		if (!sn) {
+			eprintf ("Warning: No SN reg alias for current architecture.\n");
 		}
 		if (sn && op.type == R_ANAL_OP_TYPE_SWI) {
 			r_flag_space_set (core->flags, R_FLAGS_FS_SYSCALLS);

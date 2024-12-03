@@ -1,4 +1,4 @@
-/* radare - LGPL - Copyright 2019 - GustavoLCR */
+/* radare - LGPL - Copyright 2019-2022 - GustavoLCR */
 
 #include "ne.h"
 
@@ -70,16 +70,16 @@ static char *__func_name_from_ord(char *module, ut16 ordinal) {
 
 RList *r_bin_ne_get_segments(r_bin_ne_obj_t *bin) {
 	int i;
-	if (!bin) {
+	if (!bin || !bin->segment_entries) {
 		return NULL;
 	}
 	RList *segments = r_list_newf (free);
 	for (i = 0; i < bin->ne_header->SegCount; i++) {
 		RBinSection *bs = R_NEW0 (RBinSection);
-		NE_image_segment_entry *se = &bin->segment_entries[i];
 		if (!bs) {
 			return segments;
 		}
+		NE_image_segment_entry *se = &bin->segment_entries[i];
 		bs->size = se->length;
 		bs->vsize = se->minAllocSz ? se->minAllocSz : 64000;
 		bs->bits = R_SYS_BITS_16;
@@ -367,6 +367,9 @@ RList *r_bin_ne_get_entrypoints(r_bin_ne_obj_t *bin) {
 	}
 	int off = 0;
 	while (off < bin->ne_header->EntryTableLength) {
+		if (bin->entry_table + off + 32 >= r_buf_size (bin->buf)) {
+			break;
+		}
 		ut8 bundle_length = *(ut8 *)(bin->entry_table + off);
 		if (!bundle_length) {
 			break;
@@ -391,7 +394,9 @@ RList *r_bin_ne_get_entrypoints(r_bin_ne_obj_t *bin) {
 				ut8 segnum = *(bin->entry_table + off);
 				off++;
 				ut16 segoff = *(ut16 *)(bin->entry_table + off);
-				entry->paddr = (ut64)bin->segment_entries[segnum - 1].offset * bin->alignment + segoff;
+				if (segnum > 0) {
+					entry->paddr = (ut64)bin->segment_entries[segnum - 1].offset * bin->alignment + segoff;
+				}
 			} else { // Fixed
 				entry->paddr = (ut64)bin->segment_entries[bundle_type - 1].offset * bin->alignment + *(ut16 *)(bin->entry_table + off);
 			}
@@ -418,7 +423,7 @@ RList *r_bin_ne_get_relocs(r_bin_ne_obj_t *bin) {
 		return NULL;
 	}
 
-	ut16 *modref = malloc (bin->ne_header->ModRefs * sizeof (ut16));
+	ut16 *modref = calloc (bin->ne_header->ModRefs, sizeof (ut16));
 	if (!modref) {
 		return NULL;
 	}
@@ -444,7 +449,8 @@ RList *r_bin_ne_get_relocs(r_bin_ne_obj_t *bin) {
 			continue;
 		}
 		off += 2;
-		while (off < start + length * sizeof (NE_image_reloc_item)) {
+		size_t buf_size = r_buf_size (bin->buf);
+		while (off < start + length * sizeof (NE_image_reloc_item) && off < buf_size) {
 			RBinReloc *reloc = R_NEW0 (RBinReloc);
 			if (!reloc) {
 				return NULL;
@@ -477,10 +483,11 @@ RList *r_bin_ne_get_relocs(r_bin_ne_obj_t *bin) {
 					break;
 				}
 				char *name;
-				if (rel.index > bin->ne_header->ModRefs) {
+				if (rel.index < 1 || rel.index > bin->ne_header->ModRefs) {
 					name = r_str_newf ("UnknownModule%d_%x", rel.index, off); // ????
 				} else {
-					offset = modref[rel.index - 1] + bin->header_offset + bin->ne_header->ImportNameTable;
+					int index = rel.index;
+					offset = modref[index - 1] + bin->header_offset + bin->ne_header->ImportNameTable;
 					name = __read_nonnull_str_at (bin->buf, offset);
 				}
 				if (rel.flags & IMPORTED_ORD) {
@@ -556,7 +563,14 @@ void __init(RBuffer *buf, r_bin_ne_obj_t *bin) {
 		return;
 	}
 	bin->buf = buf;
+	// XXX this is endian unsafe
 	r_buf_read_at (buf, bin->header_offset, (ut8 *)bin->ne_header, sizeof (NE_image_header));
+	if (bin->ne_header->FileAlnSzShftCnt > 8) {
+		bin->ne_header->FileAlnSzShftCnt = 8;
+	}
+	if (bin->ne_header->ModRefs * sizeof (ut16) >= r_buf_size (bin->buf)) {
+		bin->ne_header->ModRefs = r_buf_size (bin->buf) / sizeof (ut16);
+	}
 	bin->alignment = 1 << bin->ne_header->FileAlnSzShftCnt;
 	if (!bin->alignment) {
 		bin->alignment = 1 << 9;
@@ -564,8 +578,16 @@ void __init(RBuffer *buf, r_bin_ne_obj_t *bin) {
 	bin->os = __get_target_os (bin);
 
 	ut16 offset = bin->ne_header->SegTableOffset + bin->header_offset;
-	ut16 size = bin->ne_header->SegCount * sizeof (NE_image_segment_entry);
+	size_t size = bin->ne_header->SegCount * sizeof (NE_image_segment_entry);
+	if (offset >= r_buf_size (bin->buf)) {
+		return;
+	}
+	size_t remaining = r_buf_size (bin->buf) - offset;
+	size = R_MIN (remaining, size);
 	bin->segment_entries = calloc (1, size);
+	if (size >= remaining) {
+		bin->ne_header->SegCount = size / sizeof (NE_image_segment_entry);
+	}
 	if (!bin->segment_entries) {
 		return;
 	}
