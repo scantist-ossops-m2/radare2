@@ -403,13 +403,11 @@ static RList *patch_relocs(RBin *b) {
 
 	size_t nimports = 0;
 	int i;
-	if (bin->symbols) {
-		for (i = 0; i < bin->hdr.f_nsyms; i++) {
-			if (is_imported_symbol (&bin->symbols[i])) {
-				nimports++;
-			}
-			i += bin->symbols[i].n_numaux;
+	for (i = 0; i < bin->hdr.f_nsyms; i++) {
+		if (is_imported_symbol (&bin->symbols[i])) {
+			nimports++;
 		}
+		i += bin->symbols[i].n_numaux;
 	}
 	ut64 size = nimports * BYTES_PER_IMP_RELOC;
 	char *muri = r_str_newf ("malloc://%" PFMT64u, size);
