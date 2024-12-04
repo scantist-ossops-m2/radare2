@@ -377,9 +377,6 @@ static void dex_parse_debug_item(RBinFile *binfile, RBinDexObj *bin,
 		--parameters_size;
 	}
 
-	if (p4 <= 0) {
-		return;
-	}
 	ut8 opcode = *(p4++) & 0xff;
 	while (keep) {
 		switch (opcode) {
@@ -1487,7 +1484,7 @@ static int dex_loadcode(RBinFile *arch, RBinDexObj *bin) {
 				continue;
 			}
 
-			if (bin->methods[i].class_id > bin->header.types_size) {
+			if (bin->methods[i].class_id > bin->header.types_size - 1) {
 				continue;
 			}
 			char *class_name = getstr (
