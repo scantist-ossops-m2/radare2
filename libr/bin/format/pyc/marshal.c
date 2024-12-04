@@ -1,4 +1,4 @@
-/* radare - LGPL3 - Copyright 2016-2020 - Matthieu (c0riolis) Tardy - l0stb1t*/
+/* radare - LGPL3 - Copyright 2016-2021 - Matthieu (c0riolis) Tardy - l0stb1t*/
 
 #include <r_io.h>
 #include <r_bin.h>
@@ -88,9 +88,7 @@ static ut8 *get_bytes(RBuffer *buffer, ut32 size) {
 }
 
 static pyc_object *get_none_object(void) {
-	pyc_object *ret;
-
-	ret = R_NEW0 (pyc_object);
+	pyc_object *ret = R_NEW0 (pyc_object);
 	if (!ret) {
 		return NULL;
 	}
@@ -1137,7 +1135,9 @@ static pyc_object *get_object(RBuffer *buffer) {
 	}
 
 	if (flag && ref_idx) {
-		free_object (ref_idx->data);
+		if (ref_idx->data != ret) {
+			free_object (ref_idx->data);
+		}
 		ref_idx->data = copy_object (ret);
 	}
 	return ret;
@@ -1190,10 +1190,10 @@ static bool extract_sections_symbols(pyc_object *obj, RList *sections, RList *sy
 	symbol->paddr = cobj->start_offset;
 	symbol->ordinal = symbols_ordinal++;
 	if (cobj->consts->type != TYPE_TUPLE && cobj->consts->type != TYPE_SMALL_TUPLE) {
-		goto fail;
+		goto fail2;
 	}
 	if (!r_list_append (symbols, symbol)) {
-		goto fail;
+		goto fail2;
 	}
 	r_list_foreach (((RList *)(cobj->consts->data)), i, obj) {
 		extract_sections_symbols (obj, sections, symbols, cobjs, prefix);
@@ -1201,8 +1201,11 @@ static bool extract_sections_symbols(pyc_object *obj, RList *sections, RList *sy
 	free (prefix);
 	return true;
 fail:
-
 	free (section);
+	free (prefix);
+	free (symbol);
+	return false;
+fail2:
 	free (prefix);
 	free (symbol);
 	return false;
